@@ -11,7 +11,9 @@ const toLat = (y) => (Math.atan(Math.exp((y / R) * Math.PI)) * 360) / Math.PI - 
 
 const KNS = [
   ...[...range(36, 67), ...range(76, 96)].map((n) => '69:32:0000009:' + n),
-  ...[235, 236, 238, 239, 240, 242, 257, 267, 268, 269, 290, 291, 320].map((n) => '69:32:0000013:' + n),
+  // 257 — единое землепользование, 235–256 — его обособленные участки (поля) со своими границами
+  // 258–289 — 32 участка «Красноармейца» (884,64 га по презентации), документов о праве в папке нет: на схеме это резерв
+  ...[...range(235, 291), 320].map((n) => '69:32:0000013:' + n),
 ];
 
 async function getParcel(kn) {
@@ -94,7 +96,10 @@ async function getDem(b) {
 // расстояния по дорогам от центра массива до городов (открытый сервис маршрутов OSRM)
 async function getRoutes(from) {
   const file = path.join(RAW, 'routes.json');
-  if (fs.existsSync(file)) return;
+  if (fs.existsSync(file)) { // пересчитываем, только если центр сдвинулся заметно
+    const was = JSON.parse(fs.readFileSync(file, 'utf8')).from;
+    if (Math.abs(was[0] - from[0]) < 0.003 && Math.abs(was[1] - from[1]) < 0.002) return;
+  }
   const cities = { tver: [35.9176, 56.8587], moscow: [37.6173, 55.7558], staritsa: [34.9337, 56.5145], rzhev: [34.3282, 56.2624] };
   const out = { from, cities: {} };
   for (const [k, to] of Object.entries(cities)) {
@@ -118,9 +123,24 @@ async function getRoutes(from) {
   good.forEach((p) => walk(p.geometry.coordinates));
   const M = 3300; // запас по краям в метрах проекции (около 1,8 км на местности)
   const b = { w: toLon(x0 - M), e: toLon(x1 + M), s: toLat(y0 - M), n: toLat(y1 + M), x0: x0 - M, x1: x1 + M, y0: y0 - M, y1: y1 + M };
-  fs.writeFileSync(path.join(RAW, 'bbox.json'), JSON.stringify(b));
+  const bboxFile = path.join(RAW, 'bbox.json');
+  const old = fs.existsSync(bboxFile) ? JSON.parse(fs.readFileSync(bboxFile, 'utf8')) : null;
+  if (old && ['x0', 'x1', 'y0', 'y1'].some((k) => Math.abs(old[k] - b[k]) > 1)) { // охват изменился: карту и маршруты нужно скачать заново
+    for (const f of ['osm.json', 'routes.json']) fs.rmSync(path.join(RAW, f), { force: true });
+    console.log('bbox changed: osm and routes will be refetched');
+  }
+  fs.writeFileSync(bboxFile, JSON.stringify(b));
   console.log('bbox', JSON.stringify(b), 'types', [...new Set(good.map((p) => p.geometry.type))].join(','));
   await getOsm(b);
   await getDem(b);
-  await getRoutes([toLon((x0 + x1) / 2), toLat((y0 + y1) / 2)]);
+  // маршруты считаем от центра участков с документами (взвешенного по площади), а не от центра охвата карты
+  const regKn = new Set(fs.readFileSync(path.join(__dirname, '..', 'data', 'registry.csv'), 'utf8').trim().split(/\r?\n/).slice(1).map((l) => l.split(',')[0]));
+  const isMain = (kn) => regKn.has(kn) || (kn.startsWith('69:32:0000013:') && +kn.split(':')[3] >= 235 && +kn.split(':')[3] <= 256);
+  let sx = 0, sy = 0, sw = 0;
+  for (const p of good) {
+    if (!isMain(p.kn) || p.geometry.type !== 'Polygon') continue;
+    const ring = p.geometry.coordinates[0], a = p.options.specified_area || p.options.land_record_area || 1;
+    sx += (ring.reduce((s, c) => s + c[0], 0) / ring.length) * a; sy += (ring.reduce((s, c) => s + c[1], 0) / ring.length) * a; sw += a;
+  }
+  await getRoutes([toLon(sx / sw), toLat(sy / sw)]);
 })();

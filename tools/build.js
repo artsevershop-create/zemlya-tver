@@ -161,14 +161,22 @@ const ptsSize = (g) => (g < 2 ? 0 : g < 5 ? 2 : g < 50 ? 3 : g < 100 ? 2 : 1);
 
 const parcels = [];
 const SKIP = new Set(['69:32:0000013:320']); // по НСПД собственность муниципальная
+// Участок 257 — единое землепользование: общей границы в кадастре у него нет, он состоит из 22 обособленных
+// участков 235–256 со своими границами. На схеме показываем каждое поле отдельно.
+const COMPOSITE = '69:32:0000013:257';
+const PARTS = new Set(Array.from({ length: 22 }, (_, i) => '69:32:0000013:' + (235 + i)));
+const parentOpt = JSON.parse(fs.readFileSync(path.join(RAW, 'nspd', COMPOSITE.replace(/:/g, '_') + '.json'), 'utf8')).options || {};
+let altPrice = 0;
 for (const f of fs.readdirSync(path.join(RAW, 'nspd'))) {
   const raw = JSON.parse(fs.readFileSync(path.join(RAW, 'nspd', f), 'utf8'));
-  if (SKIP.has(raw.kn)) continue;
+  if (SKIP.has(raw.kn) || raw.kn === COMPOSITE) continue;
+  const isPart = PARTS.has(raw.kn);
   const r = reg[raw.kn], o = raw.options || {};
   const quarter = raw.kn.split(':')[2] === '0000009' ? '9' : '13', n = raw.kn.split(':')[3];
   const areaM2 = r ? r.area : (o.land_record_area || o.specified_area || o.declared_area || 0);
   const ha = areaM2 / 10000;
-  const p = { id: quarter + '-' + n, kn: raw.kn, n, group: r ? 'main' : 'reserve', ha: +ha.toFixed(2), vri: o.permitted_use_established_by_document || '', cad: o.cost_value || null };
+  const p = { id: quarter + '-' + n, kn: raw.kn, n, group: r || isPart ? 'main' : 'reserve', ha: +ha.toFixed(2), vri: (isPart ? parentOpt : o).permitted_use_established_by_document || '', cad: o.cost_value || null };
+  if (isPart) p.parent = '257';
   const shared = o.right_type === 'Общая долевая собственность';
   let pts = [];
   if (raw.geometry && raw.geometry.type === 'Polygon') {
@@ -200,8 +208,14 @@ for (const f of fs.readdirSync(path.join(RAW, 'nspd'))) {
     const score = ptsDist(r.dist) + ptsSize(ha) - (shared ? 1 : 0);
     p.cls = score >= 5 ? 'A' : score >= 3 ? 'B' : 'C';
     p.price = Math.round((ha * RATE[p.cls]) / 1000) * 1000;
+  } else if (isPart) {
+    // цена как в таблице оценки: участок 257 оценён одним массивом по классу C
+    p.cls = 'C';
+    p.price = Math.round((ha * RATE.C) / 1000) * 1000;
+    const s = ptsDist(p.place ? p.place.d : null) + ptsSize(ha); // для справки: оценка каждого поля отдельно
+    altPrice += ha * RATE[s >= 5 ? 'A' : s >= 3 ? 'B' : 'C'];
   }
-  p.status = p.group === 'reserve' ? 'reserve' : p.noBounds ? 'nobounds' : shared ? 'check' : 'sale';
+  p.status = p.group === 'reserve' ? 'reserve' : isPart ? 'part' : p.noBounds ? 'nobounds' : shared ? 'check' : 'sale';
   const tags = [];
   if (p.group === 'main') {
     if (ha >= 40) tags.push('livestock');
@@ -256,6 +270,12 @@ function equalSlices(poly, ax, ay, n) { // n равных по площади п
   return out;
 }
 const unflat = (r) => { const o = []; for (let i = 0; i < r.length; i += 2) o.push([r[i], r[i + 1]]); return o; };
+const partList = parcels.filter((p) => p.parent);
+const composite = {
+  n: '257', kn: COMPOSITE, ha: +(reg[COMPOSITE].area / 10000).toFixed(2), count: partList.length,
+  min: Math.min(...partList.map((p) => p.ha)), max: Math.max(...partList.map((p) => p.ha)),
+  villages: [...new Set(partList.map((p) => p.village))],
+};
 const cand = parcels.filter((p) => p.group === 'main' && p.status === 'sale' && p.rings && p.rings.length === 1 && p.ha >= 19)
   .map((p) => ({ p, s: (p.road.d <= 30 ? 2 : p.road.d <= 300 ? 1 : 0) + (p.place.d <= 600 ? 1 : 0) + (p.cls === 'A' ? 1 : 0) }))
   .sort((a, c) => c.s - a.s || c.p.ha - a.p.ha).slice(0, 5);
@@ -310,7 +330,7 @@ const meta = {
   generated: new Date().toISOString().slice(0, 10), w: Math.round(W), h: Math.round(H),
   dem: { nx, ny, cell: CELL, west: Math.round(west), north: Math.round(north), min: Math.round(dmin), max: Math.round(dmax) },
   totals: { count: main.length, ha: +main.reduce((s, p) => s + p.ha, 0).toFixed(1), price: main.reduce((s, p) => s + p.price, 0) },
-  center, cities, near,
+  center, cities, near, composite,
 };
 fs.writeFileSync(path.join(OUT, 'parcels.json'), JSON.stringify({ meta, parcels, places }));
 fs.writeFileSync(path.join(OUT, 'map.json'), JSON.stringify({
@@ -337,6 +357,15 @@ console.log('totals', JSON.stringify(meta.totals), 'status', JSON.stringify(parc
 for (const t of ['livestock', 'farm', 'tourism', 'settlement']) { const l = main.filter((p) => p.tags.includes(t)); console.log(t, l.length, l.reduce((s, p) => s + p.ha, 0).toFixed(0) + ' ha', l.map((p) => p.n).join(',')); }
 console.log('road d', main.filter((p) => p.road).map((p) => p.n + ':' + p.road.d).join(' '));
 console.log('water', main.filter((p) => p.water && p.water.d <= 300).map((p) => p.n + ':' + p.water.d + (p.water.name || p.water.k)).join(' '));
+const partM2 = fs.readdirSync(path.join(RAW, 'nspd')).map((f) => JSON.parse(fs.readFileSync(path.join(RAW, 'nspd', f), 'utf8'))).filter((q) => PARTS.has(q.kn)).reduce((s, q) => s + ((q.options || {}).specified_area || 0), 0);
+console.log(`composite 257: ${partList.length} parts, ${partM2} m2 of ${reg[COMPOSITE].area} m2, price ${partList.reduce((s, p) => s + p.price, 0)}, if valued per field ${Math.round(altPrice)}; villages ${composite.villages.join(', ')}`);
+const res = parcels.filter((p) => p.group === 'reserve'), k13 = res.filter((p) => +p.n >= 258 && +p.n <= 289 && p.kn.includes('0000013'));
+console.log(`reserve ${res.length}, ${res.reduce((s, p) => s + p.ha, 0).toFixed(2)} ha; 258-289: ${k13.length} parcels, ${k13.reduce((s, p) => s + p.ha, 0).toFixed(2)} ha, villages ${[...new Set(k13.map((p) => p.village))].join(', ')}`);
+const withR = parcels.filter((p) => p.rings), un = (r) => { const o = []; for (let i = 0; i < r.length; i += 2) o.push([r[i], r[i + 1]]); return o; };
+const overlaps = [];
+for (const a of withR) for (const c of withR) if (a !== c && inside(a.c[0], a.c[1], c.rings.map(un))) overlaps.push(a.n + ' in ' + c.n);
+console.log('overlaps', overlaps.join('; ') || 'none');
+console.log('parts', partList.map((p) => `${p.n}:${p.ha}:${p.village}:${p.place.d}:r${p.road.d}`).join(' '));
 console.log('cities', cities.map((c) => `${c.name} ${c.km}/${c.road} км ${c.min} мин`).join('; '));
 console.log('near', near.length, near.slice(0, 14).map((v) => v.name + ' ' + v.d).join(', '));
 for (const p of parcels.filter((q) => q.split)) console.log('split', p.n, p.ha, p.village, p.split.kind, p.split.lots.map((l) => l.ha + (l.road ? '' : '!') + (l.rest ? 'R' : '')).join(' '));
