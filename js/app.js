@@ -106,6 +106,8 @@ function renderSummary() {
       <li><i class="ln reg"></i>Региональные и местные дороги</li>
       <li><i class="ln trk"></i>Полевые дороги</li>
       <li><i class="ln riv"></i>Реки и ручьи</li>
+      <li><i class="ln gas"></i>Газопровод (подземный)</li>
+      <li><i class="ln pwr"></i>ЛЭП 110 и 35 кВ</li>
       <li><i class="sw wood"></i>Лес</li>
     </ul>
     <p class="panel-note">Рельеф вытянут по высоте в 9 раз, горизонтали проведены через 5 м.</p>`;
@@ -122,6 +124,9 @@ function renderLot(p) {
     rows.push(['До трассы Р-132', nHa.format(p.main) + ' км по прямой'], ['Вода', waterText(p)], ['Ближайшая деревня', `${esc(p.place.name)}, ${nInt.format(p.place.d)} м`]);
     if (p.elev) rows.push(['Высоты', `${p.elev[0]}–${p.elev[1]} м, перепад ${p.elev[1] - p.elev[0]} м`]);
   }
+  if (B(p) && p.gas != null && p.gas <= 500) rows.push(['Газопровод', p.gas <= 30 ? 'проходит по участку или вдоль границы: действует охранная зона' : `подземный, в ${nInt.format(p.gas)} м`]);
+  if (B(p) && p.power && p.power.d <= 300) rows.push(['ЛЭП', `${p.power.v} кВ, ${p.power.d <= 30 ? 'проходит по участку или вдоль границы' : 'в ' + nInt.format(p.power.d) + ' м'}`]);
+  if (p.farm) rows.push(['Земли хозяйства', esc(p.farm)]);
   if (p.tver) rows.push(['До Твери', p.tver + ' км по прямой']);
   if (p.group === 'main') rows.push(['Ориентир цены', priceText(p)]);
   const fits = p.group === 'main' ? AUD.flatMap((a) => a.uses).filter((u) => u.short && u.f(p)).map((u) => u.short) : [];
@@ -187,7 +192,7 @@ function renderAudiences() {
   $('#fPurpose').innerHTML = ['Пока выбираю', 'Сельское хозяйство', 'Туризм', 'Бизнес', 'Государственный или муниципальный проект', 'Другое'].map((t) => `<option>${t}</option>`).join('');
 }
 
-function renderWhere() {
+function renderWhere(map) {
   const cs = data.meta.cities, w = 560, h = 330, pad = [112, 46];
   const xs = [0, ...cs.map((c) => c.ex)], ys = [0, ...cs.map((c) => c.ny)];
   const s = Math.min((w - 2 * pad[0]) / (Math.max(...xs) - Math.min(...xs)), (h - 2 * pad[1]) / (Math.max(...ys) - Math.min(...ys)));
@@ -201,7 +206,21 @@ function renderWhere() {
     <text x="${X(0)}" y="${Y(0) - 17}" text-anchor="middle" class="w-name">Участки</text>
   </svg>`;
   $('#whereList').innerHTML = cs.map((c) => `<div><dt>${c.name}</dt><dd>${c.road} км по дороге, около ${hours(c.min)} езды. По прямой ${c.km} км.</dd></div>`).join('');
-  $('#whereNear').textContent = data.meta.near.slice(0, 12).map((v) => `${v.name} (${v.d < 950 ? Math.round(v.d / 10) * 10 + ' м' : nHa.format(v.d / 1000) + ' км'})`).join(', ') + '.';
+  // что вокруг участков: названия с карты хозяйства и из OpenStreetMap
+  const of = (k) => [...new Set((map.names || []).filter((v) => v.k === k).map((v) => v.t))];
+  const main = data.parcels.filter((p) => p.group === 'main' && B(p));
+  const gasNear = main.filter((p) => p.gas != null && p.gas <= 100), pwNear = main.filter((p) => p.power && p.power.d <= 100);
+  const list = (a) => a.map((p) => p.n).sort((x, y) => x - y).join(', ');
+  const around = [
+    ['Хозяйства', `${of('farm').join(' и ')}. Участки у Аполишено, Леушкино, Бакланово, Чухино и соседних деревень — земли «Ленинского знамени» с центральной усадьбой в Гостенево; участки у Емельяново, Сафроново, Зашейково и Панофидино — земли «Красноармейца» с усадьбой в Емельяново.`],
+    ['Лес и торф', `${of('org').join(', ')}. Лесные кварталы лесничества граничат со многими полями.`],
+    ['Урочища и болота', of('loc').map((t) => t.replace(/^(ур|бол)\. /, '')).sort((a, c) => a.localeCompare(c, 'ru')).join(', ') + '.'],
+    ['Реки и ручьи', of('water').map((t) => t.replace(/^(р|руч)\. /, '')).join(', ') + '.'],
+    ['Газопровод', `Подземный газопровод пересекает массив с северо-запада на юго-восток, мимо деревни Мирная. Ближе 100 м к нему ${gasNear.length} ${lotsWord(gasNear.length)}: ${list(gasNear)}. Вдоль трубы действует охранная зона с ограничениями на строительство.`],
+    ['ЛЭП', `Линии 110 и 35 кВ. Ближе 100 м к ним ${pwNear.length} ${lotsWord(pwNear.length)}: ${list(pwNear)}.`],
+  ];
+  $('#aroundList').innerHTML = around.map((r) => `<div><dt>${r[0]}</dt><dd>${esc(r[1])}</dd></div>`).join('');
+  $('#whereNear').textContent =data.meta.near.slice(0, 12).map((v) => `${v.name} (${v.d < 950 ? Math.round(v.d / 10) * 10 + ' м' : nHa.format(v.d / 1000) + ' км'})`).join(', ') + '.';
 }
 
 function renderSplit() {
@@ -302,7 +321,7 @@ async function start() {
   $('#lead').textContent = `${main.length} ${lotsWord(main.length)} от ${nHa.format(Math.min(...main.map((p) => p.ha)))} до ${nInt.format(Math.max(...main.map((p) => p.ha)))} га у деревень Старицкого округа. Двигайте схему и нажмите на участок: откроются площадь, подъезд, вода и ориентир цены.`;
   $('#genDate').textContent = 'данные на ' + data.meta.generated.split('-').reverse().join('.');
   if (!config.showPrices) document.body.classList.add('no-prices');
-  renderAudiences(); renderWhere(); renderSplit(); renderFacts(); setupForm();
+  renderAudiences(); renderWhere(m); renderSplit(); renderFacts(); setupForm();
   $('#lotVillage').insertAdjacentHTML('beforeend', [...new Set(main.map((p) => p.village))].sort((a, c) => a.localeCompare(c, 'ru')).map((v) => `<option>${esc(v)}</option>`).join(''));
   renderTable(); renderSummary();
 

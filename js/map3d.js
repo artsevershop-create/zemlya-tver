@@ -82,6 +82,12 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     road('local', 2.8, '#6C6A5C'); road('local', 1.6, '#FCFCF7');
     road('regional', 4, '#5A5343'); road('regional', 2.6, '#FBF6E6');
     road('main', 5.6, '#5B2A1E'); road('main', 3.8, '#E58A4E');
+    for (const l of map.lines || []) { // газопровод и ЛЭП
+      g.beginPath(); line(l.p);
+      if (l.k === 'gas') { g.lineWidth = 2.6 * k; g.strokeStyle = '#8A2D8F'; g.setLineDash([11 * k, 5 * k, 2 * k, 5 * k]); }
+      else { g.lineWidth = 1.4 * k; g.strokeStyle = '#33383B'; g.setLineDash([15 * k, 5 * k]); }
+      g.stroke();
+    }
     g.setLineDash([]); g.strokeStyle = COL.red;
     for (const p of parcels) if (p.rings) {
       g.lineWidth = 1.7 * k; g.strokeStyle = p.group === 'reserve' ? COL.resEdge : COL.red;
@@ -241,6 +247,9 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     const near = Math.min(...withC.map((p) => Math.hypot(p.c[0] - pl.x, p.c[1] - pl.y)));
     if (near < 3200) addLabel(pl.name, pl.x, pl.y, pl.kind === 'village' ? 'village' : '', pl.kind === 'village' ? 1 : 2 + near / 10000);
   }
+  // хозяйства, лесничество, урочища, реки: чем мельче объект, тем раньше подпись уступает место другим
+  const NAME_PRIO = { farm: 0.3, org: 1.6, water: 2.6, loc: 3.2 };
+  for (const nm of map.names || []) addLabel(nm.t, nm.x, nm.y, 'nm-' + nm.k, NAME_PRIO[nm.k] || 3.5);
   // лучи от центра массива к городам: пунктир до края схемы, стрелка и подпись с расстоянием по дороге
   const [ccx, ccy] = meta.center;
   for (const c of meta.cities) {
