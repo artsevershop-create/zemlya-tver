@@ -16,6 +16,7 @@ const STATUS = {
   check: ['Документы уточняются', 'В кадастре указана общая долевая собственность: состав собственников уточняется.'],
   nobounds: ['Границы не установлены', 'Точные границы в кадастре не определены. На схеме показано условное положение, перед сделкой нужно межевание.'],
   missing: ['Нет в публичном кадастре', 'Участок не найден на кадастровой карте: возможно, он был разделён. Сведения уточняются.'],
+  part: ['Поле участка 257', 'Поле входит в участок 257 — единое землепользование из нескольких полей. Отдельно оно продаётся после раздела участка 257 по готовым границам.'],
   reserve: ['Резерв, права уточняются', 'Документы о праве на этот участок пока не подтверждены, он показан для полноты схемы.'],
 };
 const statusOf = (p) => (p.notInCadastre ? 'missing' : p.status);
@@ -82,20 +83,23 @@ const splitText = (p) => {
 function renderSummary() {
   const t = data.meta.totals, main = data.parcels.filter((p) => p.group === 'main');
   const count = (s) => main.filter((p) => statusOf(p) === s).length;
+  const res = data.parcels.filter((p) => p.group === 'reserve');
   $('#panel').innerHTML = `
     <h2 class="panel-h">Массив целиком</h2>
     <dl class="kv">
       <div><dt>Площадь</dt><dd>${ha(t.ha)}</dd></div>
       <div><dt>Участков</dt><dd>${t.count}</dd></div>
+      <div><dt>Резерв</dt><dd>ещё ${ha(res.reduce((s, p) => s + p.ha, 0))}, права уточняются</dd></div>
       ${data.meta.cities.filter((c) => c.onMap).map((c) => `<div><dt>До ${c.name === 'Тверь' ? 'Твери' : c.name === 'Москва' ? 'Москвы' : 'Старицы'}</dt><dd>${c.road} км по дороге</dd></div>`).join('')}
       ${config.showPrices ? `<div><dt>Ориентир цены за всё</dt><dd>${money(t.price)}</dd></div>` : ''}
     </dl>
     <h3 class="panel-sub">Условные знаки</h3>
     <ul class="legend">
       <li><i class="sw sale"></i>В продаже: ${count('sale')}</li>
+      <li><i class="sw sale"></i>Поля участка 257: ${count('part')}</li>
       <li><i class="sw check"></i>Документы уточняются: ${count('check')}</li>
-      <li><i class="sw nob"></i>Границы не установлены: ${count('nobounds')}</li>
-      <li><i class="sw res"></i>Резерв, права уточняются</li>
+      ${count('nobounds') ? `<li><i class="sw nob"></i>Границы не установлены: ${count('nobounds')}</li>` : ''}
+      <li><i class="sw res"></i>Резерв, права уточняются: ${res.length}</li>
       <li><i class="sw parts"></i>Вариант раздела на части</li>
       <li><i class="ln dir"></i>Направление на город</li>
       <li><i class="ln main"></i>Трасса Р-132 Тверь — Ржев</li>
@@ -110,6 +114,7 @@ function renderSummary() {
 function renderLot(p) {
   const st = STATUS[statusOf(p)];
   const rows = [['Площадь', ha(p.ha)], ['Кадастровый номер', esc(p.kn)]];
+  if (p.parent) rows.push(['В составе участка', esc(data.meta.composite.kn)]);
   if (p.vri) rows.push(['Разрешённое использование', esc(p.vri.toLowerCase())]);
   if (B(p)) {
     rows.push(['Подъезд', roadText(p)]);
@@ -200,8 +205,12 @@ function renderWhere() {
 }
 
 function renderSplit() {
-  const list = data.parcels.filter((p) => p.split);
+  const list = data.parcels.filter((p) => p.split), c = data.meta.composite;
   sets.split = list;
+  sets.p257 = data.parcels.filter((p) => p.parent);
+  $('#splitWhole').innerHTML = `<h3 class="sub-h">Участок 257: ${c.count} ${plural(c.count, 'поле', 'поля', 'полей')} по готовым границам</h3>
+    <p class="intro">Самый большой участок, ${ha(c.ha)}, уже состоит из ${c.count} отдельных полей от ${nHa.format(c.min)} до ${ha(c.max)} у деревень ${c.villages.map(esc).join(', ')}. У каждого поля есть свои границы и кадастровый номер, поэтому делить участок проще всего по ним: кадастровому инженеру остаётся оформить раздел единого землепользования.</p>
+    <button type="button" class="btn ghost" data-use="p257" data-jump="1" aria-pressed="false">Показать поля на схеме</button>`;
   $('#splitList').innerHTML = list.map((p) => {
     const pts = p.rings[0], xs = pts.filter((_, i) => i % 2 === 0), ys = pts.filter((_, i) => i % 2 === 1);
     const x0 = Math.min(...xs), y1 = Math.max(...ys), w = Math.max(...xs) - x0, h = y1 - Math.min(...ys), k = 300 / Math.max(w, h), m = 8;
@@ -252,12 +261,14 @@ function renderFacts() {
   const atRoad = drawn.filter((p) => p.road.d <= 30).length, atWater = drawn.filter((p) => p.water.d <= 300).length;
   const el = drawn.filter((p) => p.elev).flatMap((p) => p.elev);
   const shared = main.filter((p) => p.status === 'check').length;
+  const c = data.meta.composite, docs = main.length - c.count + 1;
   const facts = [
     ['Категория земли', 'Земли сельскохозяйственного назначения. Разрешённое использование по кадастру: для сельскохозяйственного использования или производства.'],
     ['Подъезд', `${atRoad} из ${drawn.length} участков с границами примыкают к дорогам общего пользования. Трасса Р-132 Тверь — Ржев проходит в ${nHa.format(Math.min(...drawn.map((p) => p.main)))}–${nHa.format(Math.max(...drawn.map((p) => p.main)))} км.`],
     ['Вода', `${atWater} ${lotsWord(atWater)} в пределах 300 м от Тьмаки, Долгуши или безымянных ручьёв.`],
     ['Рельеф', `Высоты участков от ${Math.min(...el)} до ${Math.max(...el)} м над уровнем моря.`],
-    ['Границы', `${drawn.length} из ${main.length} участков стоят на кадастровом учёте с границами. У участка 257 (${ha(main.find((p) => p.n === '257').ha)}) границы не установлены, участки 44, 45 и 46 на публичной кадастровой карте не найдены.`],
+    ['Состав', `По документам это ${docs} ${plural(docs, 'земельный участок', 'земельных участка', 'земельных участков')}. Участок 257 (${ha(c.ha)}) — единое землепользование из ${c.count} отдельных ${plural(c.count, 'поля', 'полей', 'полей')} от ${nHa.format(c.min)} до ${ha(c.max)}; на схеме каждое поле показано отдельно.`],
+    ['Границы', `${drawn.length} из ${main.length} участков и полей стоят на кадастровом учёте с границами. Участки 44, 45 и 46 на публичной кадастровой карте не найдены.`],
     ['Документы', `Свидетельства о государственной регистрации права 2009–2010 годов. Актуальные выписки ЕГРН готовятся; по ${shared} участкам уточняется состав собственников.`],
     ['Коммуникации', 'Сведения об электричестве, газе и воде по каждому участку предоставляются по запросу.'],
   ];

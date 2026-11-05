@@ -4,7 +4,7 @@ import { OrbitControls } from '../vendor/OrbitControls.js';
 
 const EX = 9; // во сколько раз рельеф вытянут по высоте, иначе равнина выглядит плоской
 const LIFT = { dim: 10, idle: 46, hover: 84, sel: 130 };
-const COL = { sale: '#E2B93B', check: '#EDD88F', reserve: '#C9D0C2', hover: '#F3CF58', sel: '#FFE56B', red: '#C8281E' };
+const COL = { sale: '#E2B93B', check: '#EDD88F', reserve: '#9FB0C0', resEdge: '#4F6276', hover: '#F3CF58', sel: '#FFE56B', red: '#C8281E' };
 const MAX_EDGE = 80;
 
 export function createMap(host, data, map, demBuf, cb = {}) {
@@ -84,7 +84,7 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     road('main', 5.6, '#5B2A1E'); road('main', 3.8, '#E58A4E');
     g.setLineDash([]); g.strokeStyle = COL.red;
     for (const p of parcels) if (p.rings) {
-      g.lineWidth = 1.7 * k; g.setLineDash(p.group === 'reserve' ? [5 * k, 4 * k] : []);
+      g.lineWidth = 1.7 * k; g.strokeStyle = p.group === 'reserve' ? COL.resEdge : COL.red;
       g.beginPath(); p.rings.forEach(ring); g.stroke();
     }
     return cv;
@@ -148,7 +148,7 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(tp, 3));
     geo.computeVertexNormals();
-    const baseCol = COL[p.status] || COL.sale, baseOp = p.group === 'reserve' ? 0.55 : 1;
+    const baseCol = COL[p.status] || COL.sale, baseOp = 1;
     const mat = new THREE.MeshLambertMaterial({ color: baseCol, side: THREE.DoubleSide, transparent: baseOp < 1, opacity: baseOp, depthWrite: baseOp >= 1 });
     const top = new THREE.Mesh(geo, mat);
     top.userData.id = p.id;
@@ -178,7 +178,7 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     const wGeo = new THREE.BufferGeometry();
     const wAttr = new THREE.BufferAttribute(new Float32Array(wp), 3);
     wGeo.setAttribute('position', wAttr);
-    const wMat = new THREE.MeshBasicMaterial({ color: p.group === 'reserve' ? '#8E978A' : COL.red, side: THREE.DoubleSide, transparent: true });
+    const wMat = new THREE.MeshBasicMaterial({ color: p.group === 'reserve' ? COL.resEdge : COL.red, side: THREE.DoubleSide, transparent: true });
     const wall = new THREE.Mesh(wGeo, wMat);
     scene.add(top, wall);
     pickables.push(top);

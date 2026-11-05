@@ -54,7 +54,7 @@ small{font-size:.86em;color:var(--ink2);font-weight:400}
 .panel-note{margin-top:14px;font-size:13px;color:var(--ink2)}
 .status{margin:12px 0 4px;padding:9px 11px;font-size:13.5px;line-height:1.4;border-left:4px solid var(--rye);background:rgba(226,185,59,.16)}
 .status.s-check,.status.s-nobounds,.status.s-missing{border-color:var(--red);background:rgba(200,40,30,.08)}
-.status.s-reserve{border-color:#8E978A;background:rgba(20,39,31,.06)}
+.status.s-reserve{border-color:#4F6276;background:rgba(79,98,118,.12)}
 .kv>div{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px}
 .kv dt{color:var(--ink2)}
 .kv dd{font-weight:500;font-variant-numeric:tabular-nums}
@@ -64,7 +64,7 @@ small{font-size:.86em;color:var(--ink2);font-weight:400}
 .sw{flex:none;width:22px;height:14px;border:1.5px solid var(--red)}
 .sw.sale{background:var(--rye)} .sw.check{background:var(--rye2)}
 .sw.nob{background:rgba(226,185,59,.3);border-style:dashed;border-radius:50%;height:18px;width:18px;margin:0 2px}
-.sw.res{background:#C9D0C2;border-color:#8E978A} .sw.wood{background:#B9CEAF;border-color:transparent}
+.sw.res{background:#9FB0C0;border-color:#4F6276} .sw.wood{background:#B9CEAF;border-color:transparent}
 .ln{flex:none;width:22px;height:0;border-top:4px solid #E58A4E}
 .ln.reg{border-color:#FBF6E6;box-shadow:0 0 0 1px #5A5343} .ln.trk{border-top:2px dashed #5d5244} .ln.riv{border-color:#4C8DBB;border-top-width:3px}
 
@@ -155,7 +155,7 @@ select,input,textarea{width:100%;min-width:0;min-height:42px;padding:8px 10px;bo
 .lot-link{background:none;border:0;padding:0;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .tag{font-size:13px}
 .tag::before{content:"";display:inline-block;width:9px;height:9px;margin-right:7px;background:var(--rye);border:1px solid var(--red)}
-.tag.s-check::before{background:var(--rye2)} .tag.s-nobounds::before,.tag.s-missing::before{background:#fff;border-style:dashed} .tag.s-reserve::before{background:#C9D0C2;border-color:#8E978A}
+.tag.s-check::before{background:var(--rye2)} .tag.s-nobounds::before,.tag.s-missing::before{background:#fff;border-style:dashed} .tag.s-reserve::before{background:#9FB0C0;border-color:#4F6276}
 .no-prices .price-col{display:none}
 
 .facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 56px}
