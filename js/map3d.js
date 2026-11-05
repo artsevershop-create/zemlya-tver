@@ -27,7 +27,7 @@ export function createMap(host, data, map, demBuf, cb = {}) {
   host.appendChild(el);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#D5DCCF');
-  const camera = new THREE.PerspectiveCamera(32, 1, 60, 140000);
+  const camera = new THREE.PerspectiveCamera(32, 1, 200, 120000); // ближняя граница подальше: точнее глубина на общем виде
   const controls = new OrbitControls(camera, el);
   Object.assign(controls, { enableDamping: true, dampingFactor: 0.09, minPolarAngle: 0.05, maxPolarAngle: Math.PI * 0.44, minDistance: 1200, maxDistance: 46000, screenSpacePanning: false, enableZoom: false, zoomSpeed: 0.9 });
   controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
@@ -149,7 +149,7 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     geo.setAttribute('position', new THREE.BufferAttribute(tp, 3));
     geo.computeVertexNormals();
     const baseCol = COL[p.status] || COL.sale, baseOp = p.group === 'reserve' ? 0.55 : 1;
-    const mat = new THREE.MeshLambertMaterial({ color: baseCol, side: THREE.DoubleSide, transparent: baseOp < 1, opacity: baseOp, depthWrite: baseOp >= 1, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 });
+    const mat = new THREE.MeshLambertMaterial({ color: baseCol, side: THREE.DoubleSide, transparent: baseOp < 1, opacity: baseOp, depthWrite: baseOp >= 1 });
     const top = new THREE.Mesh(geo, mat);
     top.userData.id = p.id;
     if (p.split) { // линии расчётного раздела лежат на плите и поднимаются вместе с ней
@@ -158,7 +158,7 @@ export function createMap(host, data, map, demBuf, cb = {}) {
         const ax = r[i], ay = r[i + 1], bx = r[(i + 2) % r.length], by = r[(i + 3) % r.length], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 60));
         for (let s = 0; s < n; s++) {
           const x0 = ax + ((bx - ax) * s) / n, y0 = ay + ((by - ay) * s) / n, x1 = ax + ((bx - ax) * (s + 1)) / n, y1 = ay + ((by - ay) * (s + 1)) / n;
-          lp.push(x0, hAt(x0, y0) + 3, -y0, x1, hAt(x1, y1) + 3, -y1);
+          lp.push(x0, hAt(x0, y0) + 12, -y0, x1, hAt(x1, y1) + 12, -y1);
         }
       }
       const lg = new THREE.BufferGeometry();

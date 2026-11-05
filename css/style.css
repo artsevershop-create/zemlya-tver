@@ -210,4 +210,10 @@ select,input,textarea{width:100%;min-width:0;min-height:42px;padding:8px 10px;bo
   .draft{padding:6px 16px}
   .top{padding:0 16px}
 }
+@media (max-width:420px){
+  .top{gap:10px;padding:0 12px}
+  .brand{font-size:21px}
+  .nav{flex:none;overflow:visible;font-size:14px}
+}
+@media (max-width:330px){.nav{display:none}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
