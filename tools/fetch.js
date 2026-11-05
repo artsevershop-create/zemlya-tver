@@ -73,6 +73,22 @@ async function getOsm(b) {
   }
 }
 
+// газопроводы, ЛЭП, названные болота и урочища
+async function getExtra(b) {
+  const file = path.join(RAW, 'osm_extra.json');
+  if (fs.existsSync(file)) return;
+  const box = `(${b.s.toFixed(5)},${b.w.toFixed(5)},${b.n.toFixed(5)},${b.e.toFixed(5)})`;
+  const q = `[out:json][timeout:60];(way[man_made=pipeline]${box};way[power=line]${box};node[place=locality]${box};way[natural=wetland][name]${box};relation[natural=wetland][name]${box};);out geom;`;
+  try {
+    const r = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST', headers: { 'User-Agent': 'zemlya-tver-site/1.0 (land plan visualisation)', 'Content-Type': 'application/x-www-form-urlencoded', Accept: '*/*' },
+      body: 'data=' + encodeURIComponent(q), signal: AbortSignal.timeout(90000),
+    });
+    const t = await r.text();
+    if (r.ok && t.startsWith('{')) { fs.writeFileSync(file, t); console.log('osm extra ok', t.length); } else console.log('osm extra', r.status);
+  } catch (e) { console.log('osm extra FAIL', e.message); }
+}
+
 async function getDem(b) {
   const Z = 12, n = 2 ** Z;
   const tx = (lon) => Math.floor(((lon + 180) / 360) * n);
@@ -126,12 +142,13 @@ async function getRoutes(from) {
   const bboxFile = path.join(RAW, 'bbox.json');
   const old = fs.existsSync(bboxFile) ? JSON.parse(fs.readFileSync(bboxFile, 'utf8')) : null;
   if (old && ['x0', 'x1', 'y0', 'y1'].some((k) => Math.abs(old[k] - b[k]) > 1)) { // охват изменился: карту и маршруты нужно скачать заново
-    for (const f of ['osm.json', 'routes.json']) fs.rmSync(path.join(RAW, f), { force: true });
+    for (const f of ['osm.json', 'osm_extra.json', 'routes.json']) fs.rmSync(path.join(RAW, f), { force: true });
     console.log('bbox changed: osm and routes will be refetched');
   }
   fs.writeFileSync(bboxFile, JSON.stringify(b));
   console.log('bbox', JSON.stringify(b), 'types', [...new Set(good.map((p) => p.geometry.type))].join(','));
   await getOsm(b);
+  await getExtra(b);
   await getDem(b);
   // маршруты считаем от центра участков с документами (взвешенного по площади), а не от центра охвата карты
   const regKn = new Set(fs.readFileSync(path.join(__dirname, '..', 'data', 'registry.csv'), 'utf8').trim().split(/\r?\n/).slice(1).map((l) => l.split(',')[0]));

@@ -133,6 +133,17 @@ small{font-size:.86em;color:var(--ink2);font-weight:400}
 .cut .btn{margin-top:12px}
 .sw.parts{background:linear-gradient(90deg,var(--rye) 0 45%,var(--ink) 45% 55%,var(--rye) 55%)}
 .ln.dir{border-top:2px dashed var(--ink)}
+.ml.nm-farm{font:700 19px/1 var(--display);letter-spacing:.02em;background:var(--rye);color:var(--ink);padding:4px 9px 5px}
+.ml.nm-org{font-style:italic}
+.ml.nm-loc,.ml.nm-water{font-style:italic;font-size:12px;font-weight:400;background:transparent;padding:0;text-shadow:0 0 3px #F5F7F0,0 0 3px #F5F7F0,0 0 5px #F5F7F0}
+.ml.nm-loc{color:#3E4F45}
+.ml.nm-water{color:#235F8D}
+.ln.gas{border-top:2.5px dashed #8A2D8F}
+.ln.pwr{border-top:1.5px dashed #33383B}
+.around{margin-top:34px}
+.around .kv>div{grid-template-columns:190px 1fr;font-size:15px}
+.around dt{font-weight:600;color:var(--ink)}
+.around dd{font-weight:400}
 .ml.road{background:#E58A4E;color:var(--ink)}
 .fits a{color:inherit}
 .lots-bar{display:flex;flex-wrap:wrap;align-items:end;gap:18px;margin-bottom:16px}
@@ -184,6 +195,7 @@ select,input,textarea{width:100%;min-width:0;min-height:42px;padding:8px 10px;bo
   .use{grid-template-columns:1fr 130px;gap:14px 20px}
   .use .btn{grid-column:1/-1;justify-self:start}
   .where,.cuts,.rules{grid-template-columns:1fr}
+  .around .kv>div{grid-template-columns:1fr;gap:2px}
   .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:820px){

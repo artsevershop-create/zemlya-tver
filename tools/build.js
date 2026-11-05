@@ -122,8 +122,53 @@ for (const e of osm) {
   if (rings.length) target.push(rings.map(flat));
 }
 
+// ---------- газопровод, ЛЭП и названия вокруг участков
+const extraFile = path.join(RAW, 'osm_extra.json');
+const extra = fs.existsSync(extraFile) ? JSON.parse(fs.readFileSync(extraFile, 'utf8')).elements : [];
+const lines = [], names = [];
+for (const e of extra) {
+  const t = e.tags || {};
+  if (e.type === 'way' && (t.man_made === 'pipeline' || t.power === 'line')) {
+    const pts = geomPts(e.geometry);
+    if (pts.some((p) => inBox(p, 200))) lines.push({ k: t.man_made ? 'gas' : 'power', v: t.voltage ? Math.round(t.voltage / 1000) : 0, pts: simplify(pts, 5) });
+  } else if (t.name && (t.natural === 'wetland' || t.place === 'locality')) {
+    const pts = e.type === 'node' ? [ll(e.lon, e.lat)] : e.type === 'way' ? geomPts(e.geometry) : e.members.filter((m) => m.geometry).flatMap((m) => geomPts(m.geometry));
+    const c = [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+    const nm = t.natural ? (/болот/i.test(t.name) ? t.name.replace(/^болото\s+/i, 'бол. ') : 'бол. ' + t.name) : 'ур. ' + t.name.replace(/^урочище\s+/i, '');
+    if (inBox(c, -300)) names.push({ t: nm, k: 'loc', x: Math.round(c[0]), y: Math.round(c[1]) });
+  }
+}
+// Названия с карты землепользования «Красноармейца» (data/names.csv, координаты в пикселях карты):
+// привязываем карту к местности по положению деревень.
+const GCP = [[5205, 4073, 'Емельяново'], [7269, 4202, 'Болотьково'], [6947, 6073, 'Молотино'], [4560, 5202, 'Мирная'], [9615, 4460, 'Апухлицы'], [8260, 5793, 'Сергеево'],
+  [10948, 4503, 'Курово'], [2258, 7805, 'Панофидино'], [4410, 7504, 'Афанасово'], [4464, 3059, 'Сафроново'], [6726, 2123, 'Зашейково']]
+  .map(([px0, py0, n]) => ({ px: px0, py: py0, pl: places.find((p) => p.name === n) })).filter((g) => g.pl);
+function fitAffine(key) { // наименьшие квадраты: v = a + b*px + c*py
+  const S = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], T = [0, 0, 0];
+  for (const g of GCP) { const r = [1, g.px, g.py]; for (let i = 0; i < 3; i++) { T[i] += r[i] * g.pl[key]; for (let j = 0; j < 3; j++) S[i][j] += r[i] * r[j]; } }
+  const det = (m) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D = det(S);
+  return [0, 1, 2].map((c) => det(S.map((row, i) => row.map((v, j) => (j === c ? T[i] : v)))) / D);
+}
+const ax = fitAffine('x'), ay = fitAffine('y');
+const georef = (px0, py0) => [ax[0] + ax[1] * px0 + ax[2] * py0, ay[0] + ay[1] * px0 + ay[2] * py0];
+const gcpErr = Math.sqrt(GCP.reduce((s, g) => { const q = georef(g.px, g.py); return s + (q[0] - g.pl.x) ** 2 + (q[1] - g.pl.y) ** 2; }, 0) / GCP.length);
+fs.readFileSync(path.join(ROOT, 'data', 'names.csv'), 'utf8').trim().split(/\r?\n/).slice(1).forEach((l) => {
+  const [t, k, px0, py0] = l.split(','), q = georef(+px0, +py0);
+  if (inBox(q, -300) && !names.some((n) => n.t.replace(/^\S+\s/, '') === t.replace(/^\S+\s/, '') && Math.hypot(n.x - q[0], n.y - q[1]) < 1500)) names.push({ t, k, x: Math.round(q[0]), y: Math.round(q[1]) });
+});
+// хозяйства: центральные усадьбы
+const FARMS = { 9: { t: 'колхоз «Ленинское знамя»', at: 'Гостенево' }, 13: { t: 'колхоз «Красноармеец»', at: 'Емельяново' } };
+for (const f of Object.values(FARMS)) { const pl = places.find((p) => p.name === f.at); if (pl) names.push({ t: f.t, k: 'farm', x: pl.x, y: pl.y + 420 }); }
+// реки и ручьи: подпись у точки, ближайшей к середине схемы
+const byRiver = {};
+for (const r of rivers) if (r.name) for (const p of r.pts) if (inBox(p, -400)) { const d = Math.hypot(p[0], p[1]); if (!byRiver[r.name] || d < byRiver[r.name].d) byRiver[r.name] = { d, p, k: r.k }; }
+for (const [n, v] of Object.entries(byRiver)) names.push({ t: (v.k === 'river' ? 'р. ' : 'руч. ') + n, k: 'water', x: Math.round(v.p[0]), y: Math.round(v.p[1]) });
+const gasSegs = [], powerSegs = [];
+for (const l of lines) for (let i = 1; i < l.pts.length; i++) (l.k === 'gas' ? gasSegs : powerSegs).push([l.pts[i - 1][0], l.pts[i - 1][1], l.pts[i][0], l.pts[i][1], l]);
+
 // ---------- участки
-const RATE = { A: 70000, B: 50000, C: 35000 }; // базовые ставки, ₽/га: те же, что в таблице «Реестр и оценка участков»
+const RATE ={ A: 70000, B: 50000, C: 35000 }; // базовые ставки, ₽/га: те же, что в таблице «Реестр и оценка участков»
 const reg = {};
 fs.readFileSync(path.join(ROOT, 'data', 'registry.csv'), 'utf8').trim().split(/\r?\n/).slice(1).forEach((l) => {
   const [kn, area, lm, dist] = l.split(',');
@@ -202,7 +247,10 @@ for (const f of fs.readdirSync(path.join(RAW, 'nspd'))) {
     for (const pl of places) for (const q of pts) { const d = Math.hypot(q[0] - pl.x, q[1] - pl.y); if (d < bd) { bd = d; bp = pl; } }
     p.place = { d: Math.round(bd), name: bp.name };
     p.tver = Math.round(hav(toLat(p.c[1] / K + Yc), toLon(p.c[0] / K + Xc)));
+    if (gasSegs.length) p.gas = nearest(pts, gasSegs).d;
+    if (powerSegs.length) { const pw = nearest(pts, powerSegs); p.power = { d: pw.d, v: pw.obj.v }; }
   }
+  p.farm = FARMS[quarter].t;
   p.village = r ? (r.lm.startsWith('с/п') ? 'Емельяновское' : r.lm.split(' ')[0]) : (p.place ? p.place.name : '');
   if (r) {
     const score = ptsDist(r.dist) + ptsSize(ha) - (shared ? 1 : 0);
@@ -335,7 +383,11 @@ const meta = {
 fs.writeFileSync(path.join(OUT, 'parcels.json'), JSON.stringify({ meta, parcels, places }));
 fs.writeFileSync(path.join(OUT, 'map.json'), JSON.stringify({
   roads: roads.map((r) => ({ k: r.k, ref: r.ref, p: flat(r.pts) })), rivers: rivers.map((r) => ({ k: r.k, name: r.name, p: flat(r.pts) })), water, forest,
+  lines: lines.map((l) => ({ k: l.k, v: l.v, p: flat(l.pts) })), names,
 }));
+console.log(`georef: ${GCP.length} villages, error ${Math.round(gcpErr)} m; lines gas ${lines.filter((l) => l.k === 'gas').length}, power ${lines.filter((l) => l.k === 'power').map((l) => l.v).join('/')} kV`);
+console.log('names', names.map((n) => `${n.t}[${n.k}]`).join('; '));
+console.log('near gas <=100m:', parcels.filter((p) => p.gas != null && p.gas <= 100).map((p) => p.n + ':' + p.gas + (p.group === 'reserve' ? 'r' : '')).join(' '), '| near power <=100m:', parcels.filter((p) => p.power && p.power.d <= 100).map((p) => p.n + ':' + p.power.d + '/' + p.power.v + (p.group === 'reserve' ? 'r' : '')).join(' '));
 fs.writeFileSync(path.join(OUT, 'dem.bin'), Buffer.from(demI.buffer));
 
 const cp = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to); };
