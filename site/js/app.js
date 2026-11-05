@@ -8,6 +8,7 @@ const nHa = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
 const ha = (v) => nHa.format(v) + ' га';
 const money = (v) => (v >= 1e6 ? nHa.format(v / 1e6) + ' млн ₽' : nInt.format(Math.round(v / 1000)) + ' тыс. ₽');
 const plural = (n, a, b, c) => { const m = n % 100, k = n % 10; return m > 10 && m < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; };
+const lotName = (p) => `№ ${p.n} - ${ha(p.ha)}`; // единый формат названия участка
 const lotsWord = (n) => plural(n, 'участок', 'участка', 'участков');
 const hours = (min) => (min < 60 ? `${min} мин` : `${Math.floor(min / 60)} ч${min % 60 >= 8 ? ' ' + Math.round((min % 60) / 5) * 5 + ' мин' : ''}`);
 
@@ -16,7 +17,7 @@ const STATUS = {
   check: ['Документы уточняются', 'В кадастре указана общая долевая собственность: состав собственников уточняется.'],
   nobounds: ['Границы не установлены', 'Точные границы в кадастре не определены. На схеме показано условное положение, перед сделкой нужно межевание.'],
   missing: ['Нет в публичном кадастре', 'Участок не найден на кадастровой карте: возможно, он был разделён. Сведения уточняются.'],
-  part: ['Поле участка 257', 'Поле входит в участок 257 — единое землепользование из нескольких полей. Отдельно оно продаётся после раздела участка 257 по готовым границам.'],
+  part: ['Поле участка № 257', 'Поле входит в участок № 257 — единое землепользование из нескольких полей. Отдельно оно продаётся после раздела участка № 257 по готовым границам.'],
   reserve: ['Резерв, права уточняются', 'Документы о праве на этот участок пока не подтверждены, он показан для полноты схемы.'],
 };
 const statusOf = (p) => (p.notInCadastre ? 'missing' : p.status);
@@ -96,7 +97,7 @@ function renderSummary() {
     <h3 class="panel-sub">Условные знаки</h3>
     <ul class="legend">
       <li><i class="sw sale"></i>В продаже: ${count('sale')}</li>
-      <li><i class="sw sale"></i>Поля участка 257: ${count('part')}</li>
+      <li><i class="sw sale"></i>Поля участка № 257: ${count('part')}</li>
       <li><i class="sw check"></i>Документы уточняются: ${count('check')}</li>
       ${count('nobounds') ? `<li><i class="sw nob"></i>Границы не установлены: ${count('nobounds')}</li>` : ''}
       <li><i class="sw res"></i>Резерв, права уточняются: ${res.length}</li>
@@ -132,7 +133,7 @@ function renderLot(p) {
   const fits = p.group === 'main' ? AUD.flatMap((a) => a.uses).filter((u) => u.short && u.f(p)).map((u) => u.short) : [];
   $('#panel').innerHTML = `
     <button type="button" class="panel-close" id="panelClose">К массиву целиком</button>
-    <h2 class="panel-h">Участок ${esc(p.n)}</h2>
+    <h2 class="panel-h">${esc(lotName(p))}</h2>
     <p class="panel-where">у деревни ${esc(p.village)}</p>
     <p class="status s-${statusOf(p)}"><b>${st[0]}.</b> ${st[1]}</p>
     <dl class="kv">${rows.map((r) => `<div><dt>${r[0]}</dt><dd>${r[1]}</dd></div>`).join('')}</dl>
@@ -181,7 +182,7 @@ function renderAudiences() {
       const ranked = [...m].filter((p) => B(p) && p.status === 'sale').sort((x, y) => (x.road.d <= 30) === (y.road.d <= 30) ? y.ha - x.ha : x.road.d <= 30 ? -1 : 1);
       const best = m.length === main.length ? null : ranked.find((p) => !shown.has(p.id)) || ranked[0];
       if (best) shown.add(best.id);
-      const eg = best ? `Например, участок ${best.n} (${ha(best.ha)}) у деревни ${esc(best.village)}: ${roadText(best)}${best.water.d <= 300 ? ', ' + waterText(best) : ''}.` : '';
+      const eg = best ? `Например, ${lotName(best)}, у деревни ${esc(best.village)}: ${roadText(best)}${best.water.d <= 300 ? ', ' + waterText(best) : ''}.` : '';
       return `<article class="use">
         <div><h3>${u.title}</h3><p>${u.text}</p><p class="use-ex">${eg}</p></div>
         <p class="use-num"><b>${m.length}</b> ${lotsWord(m.length)}<br><b>${nInt.format(sum)}</b> га</p>
@@ -216,8 +217,8 @@ function renderWhere(map) {
     ['Лес и торф', `${of('org').join(', ')}. Лесные кварталы лесничества граничат со многими полями.`],
     ['Урочища и болота', of('loc').map((t) => t.replace(/^(ур|бол)\. /, '')).sort((a, c) => a.localeCompare(c, 'ru')).join(', ') + '.'],
     ['Реки и ручьи', of('water').map((t) => t.replace(/^(р|руч)\. /, '')).join(', ') + '.'],
-    ['Газопровод', `Подземный газопровод пересекает массив с северо-запада на юго-восток, мимо деревни Мирная. Ближе 100 м к нему ${gasNear.length} ${lotsWord(gasNear.length)}: ${list(gasNear)}. Вдоль трубы действует охранная зона с ограничениями на строительство.`],
-    ['ЛЭП', `Линии 110 и 35 кВ. Ближе 100 м к ним ${pwNear.length} ${lotsWord(pwNear.length)}: ${list(pwNear)}.`],
+    ['Газопровод', `Подземный газопровод пересекает массив с северо-запада на юго-восток, мимо деревни Мирная. Ближе 100 м к нему ${gasNear.length} ${lotsWord(gasNear.length)}: № ${list(gasNear)}. Вдоль трубы действует охранная зона с ограничениями на строительство.`],
+    ['ЛЭП', `Линии 110 и 35 кВ. Ближе 100 м к ним ${pwNear.length} ${lotsWord(pwNear.length)}: № ${list(pwNear)}.`],
   ];
   $('#aroundList').innerHTML = around.map((r) => `<div><dt>${r[0]}</dt><dd>${esc(r[1])}</dd></div>`).join('');
   $('#whereNear').textContent =data.meta.near.slice(0, 12).map((v) => `${v.name} (${v.d < 950 ? Math.round(v.d / 10) * 10 + ' м' : nHa.format(v.d / 1000) + ' км'})`).join(', ') + '.';
@@ -227,7 +228,7 @@ function renderSplit() {
   const list = data.parcels.filter((p) => p.split), c = data.meta.composite;
   sets.split = list;
   sets.p257 = data.parcels.filter((p) => p.parent);
-  $('#splitWhole').innerHTML = `<h3 class="sub-h">Участок 257: ${c.count} ${plural(c.count, 'поле', 'поля', 'полей')} по готовым границам</h3>
+  $('#splitWhole').innerHTML = `<h3 class="sub-h">№ 257 - ${ha(c.ha)}: ${c.count} ${plural(c.count, 'поле', 'поля', 'полей')} по готовым границам</h3>
     <p class="intro">Самый большой участок, ${ha(c.ha)}, уже состоит из ${c.count} отдельных полей от ${nHa.format(c.min)} до ${ha(c.max)} у деревень ${c.villages.map(esc).join(', ')}. У каждого поля есть свои границы и кадастровый номер, поэтому делить участок проще всего по ним: кадастровому инженеру остаётся оформить раздел единого землепользования.</p>
     <button type="button" class="btn ghost" data-use="p257" data-jump="1" aria-pressed="false">Показать поля на схеме</button>`;
   $('#splitList').innerHTML = list.map((p) => {
@@ -243,7 +244,7 @@ function renderSplit() {
         ${p.split.lots.map((l) => { const c = mid(l.ring); return `<text x="${c[0]}" y="${c[1]}" text-anchor="middle">${nHa.format(l.ha)}</text>`; }).join('')}
       </svg>
       <div>
-        <h3>Участок ${p.n}, ${ha(p.ha)}</h3>
+        <h3>${lotName(p)}</h3>
         <p class="cut-where">у деревни ${esc(p.village)}; ${roadText(p)}</p>
         <p>Вариант: ${splitText(p)}.</p>
         <p class="cut-note">${noRoad ? `У ${noRoad} ${plural(noRoad, 'части', 'частей', 'частей')} нет выхода к дороге общего пользования: понадобится проезд вдоль границы или подъезд по полевой дороге.` : 'Все части выходят к дороге.'}</p>
@@ -263,9 +264,8 @@ function renderTable() {
   const list = data.parcels.filter((p) => (scope === 'all' || p.group === 'main') && (!village || p.village === village))
     .sort((a, c) => { const x = key(a), y = key(c); return (typeof x === 'string' ? x.localeCompare(y, 'ru') : x - y) * state.dir; });
   $('#lotTable tbody').innerHTML = list.map((p) => `<tr data-id="${p.id}" class="${p.id === state.sel ? 'on' : ''} ${p.group}">
-      <td><button type="button" class="lot-link">№ ${esc(p.n)}</button></td>
+      <td><button type="button" class="lot-link">${esc(lotName(p))}</button></td>
       <td>${esc(p.village)}</td>
-      <td class="num">${nHa.format(p.ha)}</td>
       <td class="num">${!B(p) ? '—' : p.road.d <= 30 ? 'у дороги' : nInt.format(p.road.d)}</td>
       <td class="num">${!B(p) ? '—' : p.water.d > 1500 ? 'дальше 1 500' : nInt.format(p.water.d)}</td>
       <td class="num price-col">${p.group === 'main' && config.showPrices ? money(p.price) : 'по запросу'}</td>
@@ -286,8 +286,8 @@ function renderFacts() {
     ['Подъезд', `${atRoad} из ${drawn.length} участков с границами примыкают к дорогам общего пользования. Трасса Р-132 Тверь — Ржев проходит в ${nHa.format(Math.min(...drawn.map((p) => p.main)))}–${nHa.format(Math.max(...drawn.map((p) => p.main)))} км.`],
     ['Вода', `${atWater} ${lotsWord(atWater)} в пределах 300 м от Тьмаки, Долгуши или безымянных ручьёв.`],
     ['Рельеф', `Высоты участков от ${Math.min(...el)} до ${Math.max(...el)} м над уровнем моря.`],
-    ['Состав', `По документам это ${docs} ${plural(docs, 'земельный участок', 'земельных участка', 'земельных участков')}. Участок 257 (${ha(c.ha)}) — единое землепользование из ${c.count} отдельных ${plural(c.count, 'поля', 'полей', 'полей')} от ${nHa.format(c.min)} до ${ha(c.max)}; на схеме каждое поле показано отдельно.`],
-    ['Границы', `${drawn.length} из ${main.length} участков и полей стоят на кадастровом учёте с границами. Участки 44, 45 и 46 на публичной кадастровой карте не найдены.`],
+    ['Состав', `По документам это ${docs} ${plural(docs, 'земельный участок', 'земельных участка', 'земельных участков')}. № 257 - ${ha(c.ha)} — единое землепользование из ${c.count} отдельных ${plural(c.count, 'поля', 'полей', 'полей')} от ${nHa.format(c.min)} до ${ha(c.max)}; на схеме каждое поле показано отдельно.`],
+    ['Границы', `${drawn.length} из ${main.length} участков и полей стоят на кадастровом учёте с границами. № 44, 45 и 46 на публичной кадастровой карте не найдены.`],
     ['Документы', `Свидетельства о государственной регистрации права 2009–2010 годов. Актуальные выписки ЕГРН готовятся; по ${shared} участкам уточняется состав собственников.`],
     ['Коммуникации', 'Сведения об электричестве, газе и воде по каждому участку предоставляются по запросу.'],
   ];
@@ -331,7 +331,7 @@ async function start() {
       onSelect: (p) => select(p),
       onHover: (p, e) => {
         tip.hidden = !p;
-        if (p) { tip.textContent = `Участок ${p.n}, ${ha(p.ha)}`; const r = $('#plan').getBoundingClientRect(); tip.style.transform = `translate(${e.clientX - r.left + 14}px,${e.clientY - r.top + 14}px)`; }
+        if (p) { tip.textContent = lotName(p); const r = $('#plan').getBoundingClientRect(); tip.style.transform = `translate(${e.clientX - r.left + 14}px,${e.clientY - r.top + 14}px)`; }
       },
       onAzimuth: (a) => { $('#north').style.transform = `rotate(${a}rad)`; },
     });

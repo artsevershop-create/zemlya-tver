@@ -247,6 +247,9 @@ export function createMap(host, data, map, demBuf, cb = {}) {
     const near = Math.min(...withC.map((p) => Math.hypot(p.c[0] - pl.x, p.c[1] - pl.y)));
     if (near < 3200) addLabel(pl.name, pl.x, pl.y, pl.kind === 'village' ? 'village' : '', pl.kind === 'village' ? 1 : 2 + near / 10000);
   }
+  // подписи участков: «№ 81 - 49,2 га»; крупные участки подписываются первыми
+  const nHa = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+  for (const p of withC) addLabel(`№ ${p.n} - ${nHa.format(p.ha)} га`, p.c[0], p.c[1], p.group === 'reserve' ? 'lot res' : 'lot', (p.group === 'reserve' ? 2.5 : 1.9) - Math.min(p.ha, 100) / 200);
   // хозяйства, лесничество, урочища, реки: чем мельче объект, тем раньше подпись уступает место другим
   const NAME_PRIO = { farm: 0.3, org: 1.6, water: 2.6, loc: 3.2 };
   for (const nm of map.names || []) addLabel(nm.t, nm.x, nm.y, 'nm-' + nm.k, NAME_PRIO[nm.k] || 3.5);
