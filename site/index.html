@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Земля в Старицком округе: 1 590 га под хозяйство и загородные проекты</title>
+<meta name="description" content="Участки сельскохозяйственного назначения в Старицком округе Тверской области: 3D-схема, площади, подъезды, ориентиры цен.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#plan" id="brand">Земля в Старицком округе</a>
+  <nav class="nav" aria-label="Разделы">
+    <a href="#where">Где это</a>
+    <a href="#agro">Сельское хозяйство</a>
+    <a href="#tourism">Туризм</a>
+    <a href="#business">Бизнес</a>
+    <a href="#state">Государство</a>
+    <a href="#split">Раздел участков</a>
+    <a href="#lots">Все участки</a>
+    <a href="#request">Запросить<span class="long"> предложение</span></a>
+  </nav>
+</header>
+<p class="draft" id="draft" hidden>Предварительная версия: сведения о правах на участки уточняются, цены ориентировочные.</p>
+
+<main>
+<section class="plan" id="plan" aria-label="3D-схема участков">
+  <div class="plan-map" id="map"></div>
+
+  <div class="plan-title">
+    <h1 id="h1">1 590 гектаров сельхозземли под Тверью</h1>
+    <p id="lead">Участки у деревень Старицкого округа. Двигайте схему и нажмите на участок: откроются площадь, подъезд, вода и ориентир цены.</p>
+  </div>
+
+  <aside class="plan-panel" id="panel" aria-live="polite"></aside>
+
+  <div class="plan-tools">
+    <div class="seg" role="group" aria-label="Вид схемы">
+      <button type="button" data-view="plan">План</button>
+      <button type="button" data-view="relief" aria-pressed="true">Рельеф</button>
+    </div>
+    <button type="button" class="tool" data-act="home">Весь массив</button>
+    <button type="button" class="tool sq" data-act="in" aria-label="Приблизить">+</button>
+    <button type="button" class="tool sq" data-act="out" aria-label="Отдалить">−</button>
+    <span class="north" aria-hidden="true"><svg id="north" viewBox="0 0 24 24" width="30" height="30"><path d="M12 2l5 14-5-3-5 3z" fill="#C8281E"/><text x="12" y="23.5" text-anchor="middle" font-size="7" font-weight="600" fill="#14271F">С</text></svg></span>
+  </div>
+
+  <div class="plan-chips" id="chips" role="group" aria-label="Показать участки под задачу"></div>
+  <p class="plan-hint" id="hint">Тяните, чтобы двигать. Правая кнопка мыши или два пальца: поворот. Колесо после нажатия на схему: масштаб.</p>
+  <div class="tip" id="tip" hidden></div>
+</section>
+
+<section class="band" id="where">
+  <div class="wrap">
+    <h2>Где находится земля</h2>
+    <p class="intro">Емельяновское сельское поселение Старицкого округа Тверской области, между Тверью и Старицей. На 3D-схеме направления на города показаны пунктиром со стрелкой.</p>
+    <div class="where">
+      <div id="whereMap"></div>
+      <div>
+        <dl class="kv wide-kv" id="whereList"></dl>
+        <h3 class="sub-h">Ближайшие населённые пункты</h3>
+        <p id="whereNear"></p>
+        <p class="fine">Расстояния по дорогам посчитаны от центра массива по картам OpenStreetMap, время указано без пробок. В скобках у деревень: расстояние до ближайшего участка.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="audiences"></div>
+
+<section class="band" id="split">
+  <div class="wrap">
+    <h2>Как разделить большие участки</h2>
+    <p class="intro">Крупное поле можно продать целиком или разделить: небольшие участки у дороги покупают чаще, а в объявлениях по области гектар в них стоит дороже, чем в больших массивах.</p>
+    <ul class="rules">
+      <li><b>Кто делит.</b> Кадастровый инженер готовит межевой план, новые участки ставятся на учёт и получают свои номера. Исходный участок после этого перестаёт существовать.</li>
+      <li><b>Что сохраняется.</b> Категория земли и разрешённое использование у новых участков остаются прежними.</li>
+      <li><b>Подъезд.</b> У каждого нового участка должен быть доступ к дороге: напрямую или через проезд.</li>
+      <li><b>Минимальный размер.</b> Его задаёт закон Тверской области № 79-ЗО. В разных редакциях это 0,5 га или средняя районная земельная доля, поэтому действующую норму нужно уточнить до межевания.</li>
+      <li><b>Когда делить нельзя.</b> Пока у участка не установлены границы или не определён состав собственников.</li>
+    </ul>
+    <h3 class="sub-h">Расчётные варианты для пяти участков</h3>
+    <p class="intro">Выбраны участки от 19 га с границами, без долевой собственности, ближе всего к дороге и деревне. Раздел посчитан по контуру участка и линии дороги, без выезда на место: это эскиз для обсуждения с кадастровым инженером. Числа на рисунках: площадь части в гектарах.</p>
+    <div class="cuts" id="splitList"></div>
+  </div>
+</section>
+
+<section class="band" id="lots">
+  <div class="wrap">
+    <h2>Все участки</h2>
+    <div class="lots-bar">
+      <label>Показать
+        <select id="lotScope">
+          <option value="main">участки с документами о праве</option>
+          <option value="all">все, включая резерв</option>
+        </select>
+      </label>
+      <label>У деревни
+        <select id="lotVillage"><option value="">любой</option></select>
+      </label>
+      <p id="lotCount"></p>
+    </div>
+    <div class="table-scroll">
+      <table class="lots" id="lotTable">
+        <thead><tr>
+          <th><button type="button" data-sort="n">Участок</button></th>
+          <th><button type="button" data-sort="village">Деревня</button></th>
+          <th class="num"><button type="button" data-sort="ha">Площадь, га</button></th>
+          <th class="num"><button type="button" data-sort="road">До дороги, м</button></th>
+          <th class="num"><button type="button" data-sort="water">До воды, м</button></th>
+          <th class="num price-col"><button type="button" data-sort="price">Ориентир цены</button></th>
+          <th>Состояние</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="facts">
+  <div class="wrap">
+    <h2>Что известно об участках</h2>
+    <dl class="facts" id="factList"></dl>
+  </div>
+</section>
+
+<section class="band" id="buy">
+  <div class="wrap">
+    <h2>Как проходит покупка</h2>
+    <ol class="steps">
+      <li><h3>Выбираете участки</h3><p>На схеме или в таблице. Номера участков попадают в запрос.</p></li>
+      <li><h3>Получаете документы</h3><p>Выписку ЕГРН, план границ и сведения об обременениях по каждому участку.</p></li>
+      <li><h3>Смотрите землю</h3><p>Выезд на место с показом границ, подъезда и состояния поля.</p></li>
+      <li><h3>Оформляете сделку</h3><p>Договор купли-продажи и регистрация перехода права в Росреестре. Область имеет преимущественное право покупки сельхозземли, поэтому заложите время на уведомление.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="band request" id="request">
+  <div class="wrap">
+    <h2>Запросить предложение</h2>
+    <p class="intro">Опишите задачу, и вам ответят с документами и условиями по выбранным участкам. Для покупки всего массива или группы участков условия обсуждаются отдельно.</p>
+    <form class="form" id="form" novalidate>
+      <label>Участки<input name="lots" id="fLots" placeholder="Например: 81, 63, 79"></label>
+      <label>Что планируете
+        <select name="purpose" id="fPurpose"></select>
+      </label>
+      <label>Как к вам обращаться<input name="name" autocomplete="name"></label>
+      <label>Телефон или почта<input name="contact" autocomplete="tel"></label>
+      <label class="wide">Комментарий<textarea name="note" rows="3"></textarea></label>
+      <div class="wide form-foot">
+        <button type="submit" class="btn" id="fSend">Открыть письмо с запросом</button>
+        <p id="fNote"></p>
+      </div>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p>Сайт не является публичной офертой. Цены ориентировочные и уточняются при переговорах. Расстояния посчитаны по картографическим данным и могут отличаться от фактических.</p>
+    <p>Границы и характеристики участков: НСПД (Росреестр), <span id="genDate"></span>. Дороги, реки, лес и населённые пункты: © участники OpenStreetMap. Рельеф: Terrain Tiles (Mapzen, данные SRTM). Расстояния по дорогам: сервис маршрутов OSRM.</p>
+  </div>
+</footer>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
